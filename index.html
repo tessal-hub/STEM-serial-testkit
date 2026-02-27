@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>STM32 Web Serial</title>
+</head>
+<body>
+  <h2>STM32 UART Monitor</h2>
+  <button id="connect">Connect to STM32</button>
+  <button id="send" disabled>Send "ping\n"</button>
+  <hr>
+  <pre id="output" style="background:#111;color:#0f0;padding:10px;height:300px;overflow:auto;"></pre>
+
+  <script>
+    let writer;
+    const output = document.getElementById('output');
+    const sendBtn = document.getElementById('send');
+
+    document.getElementById('connect').addEventListener('click', async () => {
+      try {
+        const port = await navigator.serial.requestPort();
+        await port.open({
+          baudRate: 115200,
+          dataBits: 8,
+          stopBits: 1,
+          parity: 'none',
+          flowControl: 'none'
+        });
+
+        // Setup writer
+        writer = port.writable.getWriter();
+        sendBtn.disabled = false;
+
+        // Setup reader
+        const decoder = new TextDecoderStream();
+        port.readable.pipeTo(decoder.writable);
+        const reader = decoder.readable.getReader();
+
+        // Continuous read loop
+        (async () => {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            output.textContent += value;
+            output.scrollTop = output.scrollHeight; // auto-scroll
+          }
+        })();
+
+        output.textContent += '[Connected to STM32]\n';
+      } catch (err) {
+        output.textContent += `[Error]: ${err.message}\n`;
+      }
+    });
+
+    document.getElementById('send').addEventListener('click', async () => {
+      const msg = new TextEncoder().encode("ping\n");
+      await writer.write(msg);
+    });
+  </script>
+</body>
+</html>
